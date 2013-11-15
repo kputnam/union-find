@@ -1,4 +1,4 @@
-module Data.UnionFind.Array
+module Data.UnionFind.Vector
   ( newUF
   , boxed
   , unboxed
@@ -20,8 +20,8 @@ import qualified Data.Vector.Fusion.Stream.Size as S
 import qualified Data.Vector                    as B
 import qualified Data.Vector.Unboxed            as U
 
--- First array stores the parents of each element and the second
--- array stores the number of elements in each equivalence class
+-- First vector stores the parents of each element and the second
+-- vector stores the number of elements in each equivalence class
 type UF v a
   = (v a, v a)
 
@@ -35,11 +35,11 @@ newUF n = liftM2 (,) es sz
     es = V.unstream $ S.sized (S.generate m fromIntegral) (S.Exact m)
     sz = V.replicate m 0
 
--- | Cast the result of `newUF` to a boxed array representation
+-- | Cast the result of `newUF` to a boxed vector representation
 boxed :: ST s (UF (B.MVector s) a) -> ST s (UF (B.MVector s) a)
 boxed x = x
 
--- | Cast the result of `newUF` to an unboxed array representation
+-- | Cast the result of `newUF` to an unboxed vector representation
 unboxed :: U.Unbox a => ST s (UF (U.MVector s) a) -> ST s (UF (U.MVector s) a)
 unboxed x = x
 

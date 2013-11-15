@@ -7,10 +7,13 @@ module Data.UnionFind.Array
   , partition
   ) where
 
+import Data.Monoid
 import Data.Array.ST
 import Control.Monad.ST
 import qualified Data.Map as M
 
+-- First array stores the parents of each element and the second
+-- array stores the number of elements in each equivalence class
 type UF s a
   = (s a a, s a a)
 
@@ -32,14 +35,17 @@ unboxed x = x
 
 -- | The representative element of @k@'s equivalence class
 root :: (Ix a, MArray s a m) => UF s a -> a -> m a
-root u@(ps, sz) k = do
-  pk <- readArray ps k
-  if pk == k
-    then return pk
-    else root u pk
+root u@(ps, sz) k = flatten k =<< readArray ps k
+  where
+    flatten k pk
+      | k == pk   = return pk
+      | otherwise = do
+          gk <- readArray ps pk -- parent of pk, grandparent of k
+          writeArray ps k gk    -- link k to its grandparent
+          flatten pk gk
 
 -- | Join the equivalence classes of @j@ and @k@
-union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m (UF s a)
+union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m ()
 union u@(ps, sz) j k = do
   rj <- root u j
   rk <- root u k
@@ -52,7 +58,6 @@ union u@(ps, sz) j k = do
     link (ps, sz) j k n = do
       writeArray ps j k -- link j to k
       writeArray sz k n -- set k's size
-      return (ps, sz)
 
 -- | @True@ if @j@ and @k@ belong to the same equivalence class
 find :: (Ix a, MArray s a m) => UF s a -> a -> a -> m Bool
@@ -61,7 +66,7 @@ find u j k = do
   rk <- root u k
   return $ rj == rk
 
--- | Disjoint and non-empty subsets
+-- | Enumerate each disjoint and non-empty subset
 partition :: (Num a, Ix a, MArray s a m) => UF s a -> m [[a]]
 partition u@(ps, _) = do
   (_, k) <- getBounds ps
@@ -70,6 +75,4 @@ partition u@(ps, _) = do
     loop k cs
       | k < 0     = return (M.elems cs)
       | otherwise = do r <- root u k
-                       loop (k-1) (M.alter (merge k) r cs)
-    merge k (Just xs) = Just (k:xs)
-    merge k _         = Just [k]
+                       loop (k-1) (M.insertWith (<>) r [k] cs)

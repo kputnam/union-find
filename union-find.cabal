@@ -1,0 +1,31 @@
+name:           union-find
+version:        0.0.0
+cabal-version:  >= 1.8
+license:        BSD3
+license-file:   LICENSE
+author:         Kyle Putnam <putnam.kyle@gmail.com>
+maintainer:     Kyle Putnam <putnam.kyle@gmail.com>
+homepage:       https://github.com/kputnam/union-find
+category:       Algorithms, Data
+build-type:     Simple
+synopsis:       Efficient union and equivalence testing of sets
+description:
+  Efficient union and equivalence testing of sets
+
+source-repository head
+  type:     git
+  location: https://github.com/kputnam/union-find
+
+library
+  ghc-options: -Wall
+  hs-source-dirs: .
+
+  build-depends:
+    base >= 3 && <5,
+    array >= 0.4,
+    vector >= 0.10,
+    primitive >= 0.5,
+    containers >= 0.5
+  exposed-modules:
+    Data.UnionFind.Array
+    Data.UnionFind.Vector

@@ -1,5 +1,6 @@
 module Data.UnionFind.Array
-  ( newUF
+  ( UF
+  , newUF
   , boxed
   , unboxed
   , union
@@ -14,8 +15,8 @@ import qualified Data.Map as M
 
 -- First array stores the parents of each element and the second
 -- array stores the number of elements in each equivalence class
-type UF s a
-  = (s a a, s a a)
+data UF s a
+  = UF (s a a) (s a a)
 
 -- | Construct @n@ equivalence classes, each containing a single
 --   element in @0..n-1@
@@ -23,7 +24,7 @@ newUF :: (Ix a, Num a, Enum a, MArray s a m) => a -> m (UF s a)
 newUF n = do
   ps <- newListArray (0, n-1) [0..n-1]  -- parent is self
   sz <- newArray (0, n-1) 1             -- singletons
-  return (ps, sz)
+  return $ UF ps sz
 
 -- | Cast the result of `newUF` to a boxed array representation
 boxed :: ST s (UF (STArray s) a) -> ST s (UF (STArray s) a)
@@ -35,7 +36,7 @@ unboxed x = x
 
 -- | The representative element of @k@'s equivalence class
 root :: (Ix a, MArray s a m) => UF s a -> a -> m a
-root u@(ps, sz) k = flatten k =<< readArray ps k
+root (UF ps _) k = flatten k =<< readArray ps k
   where
     flatten k pk
       | k == pk   = return pk
@@ -46,16 +47,16 @@ root u@(ps, sz) k = flatten k =<< readArray ps k
 
 -- | Join the equivalence classes of @j@ and @k@
 union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m ()
-union u@(ps, sz) j k = do
+union u@(UF ps sz) j k = do
   rj <- root u j
   rk <- root u k
   sj <- readArray sz rj
   sk <- readArray sz rk
   case sj `compare` sk of
-    LT -> link u rj rk (sj + sk)
-    _  -> link u rk rj (sj + sk)
+    LT -> link rj rk (sj + sk)
+    _  -> link rk rj (sj + sk)
   where
-    link (ps, sz) j k n = do
+    link j k n = do
       writeArray ps j k -- link j to k
       writeArray sz k n -- set k's size
 
@@ -68,7 +69,7 @@ find u j k = do
 
 -- | Enumerate each disjoint and non-empty subset
 partition :: (Num a, Ix a, MArray s a m) => UF s a -> m [[a]]
-partition u@(ps, _) = do
+partition u@(UF ps _) = do
   (_, k) <- getBounds ps
   loop k M.empty
   where

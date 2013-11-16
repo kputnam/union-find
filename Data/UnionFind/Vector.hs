@@ -1,5 +1,6 @@
 module Data.UnionFind.Vector
-  ( newUF
+  ( UF
+  , newUF
   , boxed
   , unboxed
   , union
@@ -22,14 +23,14 @@ import qualified Data.Vector.Unboxed            as U
 
 -- First vector stores the parents of each element and the second
 -- vector stores the number of elements in each equivalence class
-type UF v a
-  = (v a, v a)
+data UF v a
+  = UF (v a) (v a)
 
 -- | Construct @n@ equivalence classes, each containing a single
 --   element in @0..n-1@
 newUF :: (PrimMonad m, Integral a, V.MVector v a)
       => a -> m (UF (v (PrimState m)) a)
-newUF n = liftM2 (,) es sz
+newUF n = liftM2 UF es sz
   where
     m  = fromIntegral n
     es = V.unstream $ S.sized (S.generate m fromIntegral) (S.Exact m)
@@ -46,7 +47,7 @@ unboxed x = x
 -- | The representative element of @k@'s equivalence class
 root :: (PrimMonad m, Integral a, V.MVector v a)
      => UF (v (PrimState m)) a -> a -> m a
-root u@(ps, sz) k = flatten k =<< V.read ps (fromIntegral k)
+root (UF ps _) k = flatten k =<< V.read ps (fromIntegral k)
   where
     flatten k pk
       | k == pk   = return pk
@@ -58,16 +59,16 @@ root u@(ps, sz) k = flatten k =<< V.read ps (fromIntegral k)
 -- | Join the equivalence classes of @j@ and @k@
 union :: (PrimMonad m, Integral a, V.MVector v a)
       => UF (v (PrimState m)) a -> a -> a -> m ()
-union u@(ps, sz) j k = do
+union u@(UF ps sz) j k = do
   rj <- root u j
   rk <- root u k
   sj <- V.read sz (fromIntegral rj)
   sk <- V.read sz (fromIntegral rk)
   case sj `compare` sk of
-    LT -> link u rj rk (sj + sk)
-    _  -> link u rk rj (sj + sk)
+    LT -> link rj rk (sj + sk)
+    _  -> link rk rj (sj + sk)
   where
-    link (ps, sz) j k n = do
+    link j k n = do
       V.write ps (fromIntegral j) k -- link j to k
       V.write sz (fromIntegral k) n -- set k's size
 
@@ -82,7 +83,7 @@ find u j k = do
 -- | Enumerate each disjoint and non-empty subset
 partition :: (PrimMonad m, Integral a, V.MVector v a)
           => UF (v (PrimState m)) a -> m [[a]]
-partition u@(ps, _) = do
+partition u@(UF ps _) = do
   loop (fromIntegral $ V.length ps - 1) M.empty
   where
     loop k cs

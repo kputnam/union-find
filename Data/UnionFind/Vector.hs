@@ -6,6 +6,8 @@ module Data.UnionFind.Vector
   , union
   , find
   , partition
+  , toList
+  , fromList
   ) where
 
 import Data.Monoid
@@ -35,6 +37,14 @@ newUF n = liftM2 UF es sz
     m  = fromIntegral n
     es = V.unstream $ S.sized (S.generate m fromIntegral) (S.Exact m)
     sz = V.replicate m 0
+
+-- |
+fromList :: (PrimMonad m, Integral a, V.MVector v a)
+         => a -> [(a, a)] -> m (UF (v (PrimState m)) a)
+fromList n xs = do
+  u <- newUF n
+  mapM_ (uncurry $ union u) xs
+  return u
 
 -- | Cast the result of `newUF` to a boxed vector representation
 boxed :: ST s (UF (B.MVector s) a) -> ST s (UF (B.MVector s) a)
@@ -81,12 +91,18 @@ find u j k = do
   return $ rj == rk
 
 -- | Enumerate each disjoint and non-empty subset
+toList :: (PrimMonad m, Integral a, V.MVector v a)
+       => UF (v (PrimState m)) a -> m [(a, a)]
+toList u@(UF ps _) = loop [] (fromIntegral $ V.length ps - 1)
+  where
+    loop xs k | k < 0     = return xs
+              | otherwise = do r <- root u k
+                               loop ((k,r):xs) (k-1)
+
+-- | Enumerate each disjoint and non-empty subset
 partition :: (PrimMonad m, Integral a, V.MVector v a)
           => UF (v (PrimState m)) a -> m [[a]]
-partition u@(UF ps _) = do
-  loop (fromIntegral $ V.length ps - 1) M.empty
+partition u = liftM (groups . map single) (toList u)
   where
-    loop k cs
-      | k < 0     = return (M.elems cs)
-      | otherwise = do r <- root u k
-                       loop (k-1) (M.insertWith (<>) r [k] cs)
+    single (k, r) = (r, [k])
+    groups = M.elems . M.fromListWith (<>)

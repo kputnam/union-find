@@ -6,10 +6,13 @@ module Data.UnionFind.Array
   , union
   , find
   , partition
+  , toList
+  , fromList
   ) where
 
 import Data.Monoid
 import Data.Array.ST
+import Control.Monad
 import Control.Monad.ST
 import qualified Data.Map as M
 
@@ -25,6 +28,13 @@ newUF n = do
   ps <- newListArray (0, n-1) [0..n-1]  -- parent is self
   sz <- newArray (0, n-1) 1             -- singletons
   return $ UF ps sz
+
+-- |
+fromList :: (Integral a, Ix a, MArray s a m) => a -> [(a, a)] -> m (UF s a)
+fromList n xs = do
+  u <- newUF n
+  mapM_ (uncurry $ union u) xs
+  return u
 
 -- | Cast the result of `newUF` to a boxed array representation
 boxed :: ST s (UF (STArray s) a) -> ST s (UF (STArray s) a)
@@ -67,13 +77,16 @@ find u j k = do
   rk <- root u k
   return $ rj == rk
 
+toList :: (Num a, Ix a, MArray s a m) => UF s a -> m [(a, a)]
+toList u@(UF ps _) = loop [] . snd =<< getBounds ps
+  where
+    loop xs k | k < 0     = return xs
+              | otherwise = do r <- root u k
+                               loop ((k,r):xs) (k-1)
+
 -- | Enumerate each disjoint and non-empty subset
 partition :: (Num a, Ix a, MArray s a m) => UF s a -> m [[a]]
-partition u@(UF ps _) = do
-  (_, k) <- getBounds ps
-  loop k M.empty
+partition u = liftM (groups . map single) (toList u)
   where
-    loop k cs
-      | k < 0     = return (M.elems cs)
-      | otherwise = do r <- root u k
-                       loop (k-1) (M.insertWith (<>) r [k] cs)
+    single (k, r) = (r, [k])
+    groups = M.elems . M.fromListWith (<>)

@@ -17,7 +17,7 @@ source-repository head
   location: https://github.com/kputnam/union-find
 
 library
-  ghc-options: -Wall
+  ghc-options: -Wall -fno-warn-name-shadowing
   hs-source-dirs: .
 
   build-depends:

@@ -8,6 +8,8 @@ module Data.UnionFind.Vector
   , partition
   , toList
   , fromList
+  , freeze
+  , thaw
   ) where
 
 import Data.Monoid
@@ -17,6 +19,7 @@ import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Primitive
 
+import qualified Data.Vector.Generic            as G
 import qualified Data.Vector.Generic.Mutable    as V
 import qualified Data.Vector.Fusion.Stream      as S
 import qualified Data.Vector.Fusion.Stream.Size as S
@@ -26,7 +29,9 @@ import qualified Data.Vector.Unboxed            as U
 -- First vector stores the parents of each element and the second
 -- vector stores the number of elements in each equivalence class
 data UF v a
-  = UF (v a) (v a)
+  = UF { ps :: v a
+       , sz :: v a }
+  deriving (Eq, Show, Read)
 
 -- | Construct @n@ equivalence classes, each containing a single
 --   element in @0..n-1@
@@ -38,7 +43,7 @@ newUF n = liftM2 UF es sz
     es = V.unstream $ S.sized (S.generate m fromIntegral) (S.Exact m)
     sz = V.replicate m 0
 
--- |
+-- | Construct equivalence classes from pairs of equivalent elements
 fromList :: (PrimMonad m, Integral a, V.MVector v a)
          => a -> [(a, a)] -> m (UF (v (PrimState m)) a)
 fromList n xs = do
@@ -86,11 +91,11 @@ union u@(UF ps sz) j k = do
 find :: (PrimMonad m, Integral a, V.MVector v a)
      => UF (v (PrimState m)) a -> a -> a -> m Bool
 find u j k = do
-  rj <- root u (fromIntegral j)
-  rk <- root u (fromIntegral k)
+  rj <- root u j
+  rk <- root u k
   return $ rj == rk
 
--- | Enumerate each disjoint and non-empty subset
+-- | Pair each element with the representative element of its equivalence class
 toList :: (PrimMonad m, Integral a, V.MVector v a)
        => UF (v (PrimState m)) a -> m [(a, a)]
 toList u@(UF ps _) = loop [] (fromIntegral $ V.length ps - 1)
@@ -106,3 +111,13 @@ partition u = liftM (groups . map single) (toList u)
   where
     single (k, r) = (r, [k])
     groups = M.elems . M.fromListWith (<>)
+
+-- | Create an immutable copy of the mutable UF
+freeze :: (PrimMonad m, G.Vector v a)
+       => UF (G.Mutable v (PrimState m)) a -> m (UF v a)
+freeze (UF ps sz) = liftM2 UF (G.freeze ps) (G.freeze sz)
+
+-- | Create a mutable copy of the immutable UF
+thaw :: (PrimMonad m, Integral a, G.Vector v a)
+     => UF v a -> m (UF (G.Mutable v (PrimState m)) a)
+thaw (UF ps sz) = liftM2 UF (G.thaw ps) (G.thaw sz)

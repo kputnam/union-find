@@ -25,16 +25,16 @@ data UF s a
 --   element in @0..n-1@
 newUF :: (Ix a, Num a, Enum a, MArray s a m) => a -> m (UF s a)
 newUF n = do
-  ps <- newListArray (0, n-1) [0..n-1]  -- parent is self
-  sz <- newArray (0, n-1) 1             -- singletons
-  return $ UF ps sz
+  parents <- newListArray (0, n-1) [0..n-1]  -- parent is self
+  sizes   <- newArray (0, n-1) 1             -- singletons
+  return $ UF parents sizes
 
 -- |
 fromList :: (Integral a, Ix a, MArray s a m) => a -> [(a, a)] -> m (UF s a)
 fromList n xs = do
-  u <- newUF n
-  mapM_ (uncurry $ union u) xs
-  return u
+  uf <- newUF n
+  mapM_ (uncurry $ union uf) xs
+  return uf
 
 -- | Cast the result of `newUF` to a boxed array representation
 boxed :: ST s (UF (STArray s) a) -> ST s (UF (STArray s) a)
@@ -46,47 +46,48 @@ unboxed x = x
 
 -- | The representative element of @k@'s equivalence class
 root :: (Ix a, MArray s a m) => UF s a -> a -> m a
-root (UF ps _) k = flatten k =<< readArray ps k
+root (UF parents _) k = flatten k =<< readArray parents k
   where
     flatten k pk
       | k == pk   = return pk
       | otherwise = do
-          gk <- readArray ps pk -- parent of pk, grandparent of k
-          writeArray ps k gk    -- link k to its grandparent
+          gk <- readArray parents pk -- parent of pk, grandparent of k
+          writeArray parents k gk    -- link k to its grandparent
           flatten pk gk
 
 -- | Join the equivalence classes of @j@ and @k@
-union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m ()
-union u@(UF ps sz) j k = do
-  rj <- root u j
-  rk <- root u k
-  sj <- readArray sz rj
-  sk <- readArray sz rk
-  case sj `compare` sk of
-    LT -> link rj rk (sj + sk)
-    _  -> link rk rj (sj + sk)
+union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m a
+union uf@(UF parents sizes) j k = do
+  rootJ <- root uf j
+  rootK <- root uf k
+  sizeJ <- readArray sizes rootJ
+  sizeK <- readArray sizes rootK
+  case sizeJ `compare` sizeK of
+    LT -> link rootJ rootK (sizeJ + sizeK)
+    _  -> link rootK rootJ (sizeJ + sizeK)
   where
     link j k n = do
-      writeArray ps j k -- link j to k
-      writeArray sz k n -- set k's size
+      writeArray parents j k -- link j to k
+      writeArray sizes   k n -- set k's size
+      return k
 
 -- | @True@ if @j@ and @k@ belong to the same equivalence class
 find :: (Ix a, MArray s a m) => UF s a -> a -> a -> m Bool
-find u j k = do
-  rj <- root u j
-  rk <- root u k
-  return $ rj == rk
+find uf j k = do
+  rootJ <- root uf j
+  rootK <- root uf k
+  return $ rootJ == rootK
 
 toList :: (Num a, Ix a, MArray s a m) => UF s a -> m [(a, a)]
-toList u@(UF ps _) = loop [] . snd =<< getBounds ps
+toList uf@(UF parents _) = loop [] . snd =<< getBounds parents
   where
     loop xs k | k < 0     = return xs
-              | otherwise = do r <- root u k
+              | otherwise = do r <- root uf k
                                loop ((k,r):xs) (k-1)
 
 -- | Enumerate each disjoint and non-empty subset
 partition :: (Num a, Ix a, MArray s a m) => UF s a -> m [[a]]
-partition u = liftM (groups . map single) (toList u)
+partition = liftM (groups . map single) . toList
   where
-    single (k, r) = (r, [k])
+    single (k, root) = (root, [k])
     groups = M.elems . M.fromListWith (<>)

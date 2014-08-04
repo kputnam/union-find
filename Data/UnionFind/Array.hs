@@ -24,10 +24,10 @@ data UF s a
 -- | Construct @n@ equivalence classes, each containing a single
 --   element in @0..n-1@
 newUF :: (Ix a, Num a, Enum a, MArray s a m) => a -> m (UF s a)
-newUF n = do
-  parents <- newListArray (0, n-1) [0..n-1]  -- parent is self
-  sizes   <- newArray (0, n-1) 1             -- singletons
-  return $ UF parents sizes
+newUF n = liftM2 UF parents sizes
+  where
+    parents = newListArray (0, n-1) [0..n-1]  -- parent is self
+    sizes   = newArray (0, n-1) 1             -- singletons
 
 -- |
 fromList :: (Integral a, Ix a, MArray s a m) => a -> [(a, a)] -> m (UF s a)

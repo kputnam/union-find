@@ -22,9 +22,9 @@ library
 
   build-depends:
     base >= 3 && <5,
-    array >= 0.4,
-    vector >= 0.10,
-    primitive >= 0.5,
+    array      >= 0.4,
+    vector     >= 0.10,
+    primitive  >= 0.5,
     containers >= 0.5
   exposed-modules:
     Data.UnionFind.Array

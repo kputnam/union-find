@@ -11,6 +11,19 @@ import Data.STRef
 import Control.Monad.ST
 import Control.Applicative
 
+--
+-- runST $ do
+--   a <- singleton 'a'
+--   b <- singleton 'b'
+--   c <- singleton 'c'
+--   d <- singleton 'd'
+--
+--   union a d
+--   union b a
+--
+--   liftA3 (,,) (label <$> find a) (label <$> find b) (label <$> find d)
+--
+
 data Class s a =
   Class
   { label  :: a
@@ -35,7 +48,18 @@ singleton a = Class a <$> newSTRef Nothing <*> newSTRef 1
 --   The given class's `parent` reference may be updated (to reduce indirection).
 --   Runs in O(1) amortized time.
 find :: Class s a -> ST s (Class s a)
-find k = undefined
+find k = aux k =<< readSTRef (parent k)
+  where
+    aux k Nothing  = return k
+    aux k (Just p) = do
+      -- Does k have a grandparent?
+      g <- readSTRef (parent p)
+      case g of
+        Nothing ->
+          return p                -- No, p is the end of the path
+        Just g' -> do
+          writeSTRef (parent k) g -- Yes, link k to g, skipping over p,
+          aux p g                 -- then try linking p to its grandparent
 
 -- | Join the equivalence classes of @j@ and @k@, and return a reference to the
 --   element representing the class containing @j@ and @k@. Runs in O(1) amortized
@@ -48,8 +72,8 @@ union j k
       rootK <- find k
 
       -- Check if these are disjoint classes
-      if rootJ == rootK
-      then
+      if rootJ /= rootK
+      then do
         sizeJ <- readSTRef (size rootJ)
         sizeK <- readSTRef (size rootK)
 

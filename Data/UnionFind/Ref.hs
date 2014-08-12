@@ -70,7 +70,7 @@ find k = aux k =<< readSTRef (parent k)
       case g of
         Nothing ->
           return p                -- No, p is the end of the path
-        Just g' -> do
+        Just _ -> do
           writeSTRef (parent k) g -- Yes, link k to g, skipping over p,
           aux p g                 -- then try linking p to its grandparent
 
@@ -85,16 +85,19 @@ union j k
       rootK <- find k
 
       -- Check if these are disjoint classes
-      if rootJ /= rootK then do
-        weightJ <- readSTRef (weight_ rootJ)
-        weightK <- readSTRef (weight_ rootK)
-
-        -- Update the smaller class to point to the larger
-        case weightJ `compare` weightK of
-          LT -> link rootJ rootK (weightJ <> weightK)
-          _  -> link rootK rootJ (weightJ <> weightK)
-      else return rootJ
+      if rootJ /= rootK
+        then choose rootJ rootK
+        else return rootJ
   where
+    choose rootJ rootK = do
+      weightJ <- readSTRef (weight_ rootJ)
+      weightK <- readSTRef (weight_ rootK)
+
+      -- Update the smaller class to point to the larger
+      case weightJ `compare` weightK of
+        LT -> link rootJ rootK (weightJ <> weightK)
+        _  -> link rootK rootJ (weightJ <> weightK)
+
     link small large m = do
       writeSTRef (parent small) (Just large)
       writeSTRef (weight_ large) m

@@ -1,5 +1,5 @@
 name:           union-find
-version:        0.0.0
+version:        0.1.0
 cabal-version:  >= 1.8
 license:        BSD3
 license-file:   LICENSE
@@ -21,7 +21,7 @@ library
   hs-source-dirs: .
 
   build-depends:
-    base >= 3 && <5,
+    base       >= 3 && <5,
     array      >= 0.4,
     vector     >= 0.10,
     primitive  >= 0.5,
@@ -29,3 +29,4 @@ library
   exposed-modules:
     Data.UnionFind.Array
     Data.UnionFind.Vector
+    Data.UnionFind.Ref

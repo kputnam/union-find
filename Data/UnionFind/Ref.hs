@@ -11,7 +11,7 @@ module Data.UnionFind.Ref
 
 import Data.Maybe
 import Data.STRef
-import Data.Monoid
+import Data.Semigroup
 import Control.Monad.ST
 import Control.Applicative
 
@@ -54,7 +54,7 @@ instance Eq (Class s m a) where
 singleton :: a -> ST s (Class s (Sum Int) a)
 singleton a = Class a <$> newSTRef Nothing <*> newSTRef mempty
 
-weighted :: (Monoid m, Ord m) => m -> a -> ST s (Class s m a)
+weighted :: (Semigroup m, Ord m) => m -> a -> ST s (Class s m a)
 weighted m a = Class a <$> newSTRef Nothing <*> newSTRef m
 
 -- | Returns a reference to the representative element of @k@'s equivalence class.
@@ -77,7 +77,7 @@ find k = aux k =<< readSTRef (parent k)
 -- | Join the equivalence classes of @j@ and @k@, and return a reference to the
 --   element representing the class containing @j@ and @k@. Runs in O(1) amortized
 --   time.
-union :: (Monoid m, Ord m) => Class s m a -> Class s m a -> ST s (Class s m a)
+union :: (Semigroup m, Ord m) => Class s m a -> Class s m a -> ST s (Class s m a)
 union j k
   | j == k    = return j
   | otherwise = do

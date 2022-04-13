@@ -60,11 +60,14 @@ union :: (Ix a, Num a, MArray s a m) => UF s a -> a -> a -> m a
 union uf@(UF parents sizes) j k = do
   rootJ <- root uf j
   rootK <- root uf k
-  sizeJ <- readArray sizes rootJ
-  sizeK <- readArray sizes rootK
-  case sizeJ `compare` sizeK of
-    LT -> link rootJ rootK (sizeJ + sizeK)
-    _  -> link rootK rootJ (sizeJ + sizeK)
+  if rootJ == rootK
+     return k
+  else
+    sizeJ <- readArray sizes rootJ
+    sizeK <- readArray sizes rootK
+    case sizeJ `compare` sizeK of
+      LT -> link rootJ rootK (sizeJ + sizeK)
+      _  -> link rootK rootJ (sizeJ + sizeK)
   where
     link j k n = do
       writeArray parents j k -- link j to k
